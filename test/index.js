@@ -4,17 +4,17 @@ const fs = require('fs');
 const thunkify = require('thunkify');
 const path = require('path');
 const prettier = require('prettier');
-const { NodeVM } = require('vm2');
+const {NodeVM} = require('vm2');
+const dslHelper = require('@imgcook/dsl-helper');
 const _ = require('lodash');
 const data = require('./data');
-const originData = require('./origin-data');
 
 const vm = new NodeVM({
   console: 'inherit',
   sandbox: {}
 });
 
-co(function*() {
+co(function* () {
   const xtplRender = thunkify(xtpl.render);
   const code = fs.readFileSync(
     path.resolve(__dirname, '../src/index.js'),
@@ -23,7 +23,7 @@ co(function*() {
   const renderInfo = vm.run(code)(data, {
     prettier: prettier,
     _: _,
-    originData: originData
+    helper: dslHelper
   });
   const renderData = renderInfo.renderData;
   const ret = yield xtplRender(
@@ -32,9 +32,5 @@ co(function*() {
     {}
   );
 
-  console.log(
-    prettier.format(ret, {
-      printWidth: 120
-    })
-  );
+  console.log(ret);
 });

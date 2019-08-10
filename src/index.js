@@ -37,7 +37,7 @@ module.exports = function (layoutData, opts) {
   let modConfig = layoutData.modStyleConfig || {
     designWidth: 750
   };
-  let viewportWidth = modConfig.viewportWidth || 375;
+  let viewportWidth = modConfig.viewportWidth || 750;
   let designWidth = modConfig.designWidth;
   let htmlFontsize = viewportWidth ? viewportWidth / 10 : null;
 
