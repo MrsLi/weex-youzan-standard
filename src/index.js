@@ -39,12 +39,15 @@ module.exports = function (layoutData, opts) {
   };
   let viewportWidth = modConfig.viewportWidth || 750;
   let designWidth = modConfig.designWidth;
-  let htmlFontsize = viewportWidth ? viewportWidth / 10 : null;
 
-  let dslMessage = genertePartJson(layoutData);
+  let dslMessage = generatePartJson(layoutData, 'px');
+
+  viewportWidth = modConfig.viewportWidth || 375;
+
+  let dslMessageWX = generatePartJson(layoutData, 'wx');
+
   renderData = {
     template: printer(dslMessage._rXML),
-    // mockDataScript: printer(dslMessage._rMockData),
     script: printer(dslMessage._rScript),
     style: printer(dslMessage._rStyle)
   };
@@ -63,6 +66,19 @@ module.exports = function (layoutData, opts) {
     _line('</style>', {indent: {tab: 0}})
   ]);
 
+  let vuejs_wx = printer([
+    _line('<template>', {indent: {tab: 0}}),
+    ...dslMessageWX._rXML,
+    _line('</template>', {indent: {tab: 0}}),
+    _line('', {indent: {tab: 0}}),
+    _line('<script>', {indent: {tab: 0}}),
+    ...dslMessageWX._rScript,
+    _line('</script>', {indent: {tab: 0}}),
+    _line('<style scoped>', {indent: {tab: 0}}),
+    ...dslMessageWX._rStyle,
+    _line('</style>', {indent: {tab: 0}})
+  ]);
+
   return {
     renderData: renderData,
     xml: renderData.template,
@@ -70,16 +86,19 @@ module.exports = function (layoutData, opts) {
     prettierOpt: {},
     panelDisplay: [
       {
-        panelName: 'index.vue',
+        panelName: 'index-px.vue',
         panelValue: vuejs,
-        panelType: 'BuilderRaxIndex'
+        panelType: 'Vue'
+      },
+      {
+        panelName: 'index-wx.vue',
+        panelValue: vuejs_wx,
+        panelType: 'Vue'
       }
     ],
     playground: {
       info: '前往vue playground',
       link: 'http://jsplayground.net/vueplayground',
-      // sourceCode: vuejs,
-      // playgroundDslName: 'vue',
       mobilePreviewUrl: 'http://jsplayground.net/bundle/{uuid}/vuebundle.html'
     },
     noTemplate: true
@@ -90,7 +109,7 @@ module.exports = function (layoutData, opts) {
    * @param originJson originJson
    * @return Object 所有文档相关的信息
    */
-  function genertePartJson(originJson) {
+  function generatePartJson(originJson, unit) {
     let mockDataStore = {};
     let methodsFunction = [];
     let computedFunction = [];
@@ -159,9 +178,7 @@ module.exports = function (layoutData, opts) {
         return true;
       }
     });
-    let {_rStyle, _rRemStyle} = generateStyle(cssStore, {
-      indent: 0
-    });
+    let {_rStyle, _rRemStyle} = generateStyle(cssStore, unit);
 
     return {
       _rXML,
@@ -177,14 +194,9 @@ module.exports = function (layoutData, opts) {
      * @param cssStore 存储css的数组
      * @return result css的partsJson
      */
-    function generateStyle(cssStore) {
+    function generateStyle(cssStore, unit) {
       indent = 2;
       let result = [];
-      let remResult = [
-        _line(
-          `/* 视觉稿宽度为 ${designWidth}, 请设置html的font-size为 ${htmlFontsize}px, 以便在布局视口宽度为 ${viewportWidth} 的页面中自适应 */`
-        )
-      ];
       cssStore.map((v, i) => {
         let styleCssLine = [];
         let styleRemCssLine = [];
@@ -192,19 +204,10 @@ module.exports = function (layoutData, opts) {
           if (DELETE_STYLE.indexOf(_o) == -1) {
             let cssLineString = `${_.kebabCase(_o)}: ${cssValue(
               _o,
-              v.styleValue[_o]
+              v.styleValue[_o],
+              unit
             )};`;
             styleCssLine.push(_line(cssLineString, {indent: {tab: indent + 2}}));
-            if (htmlFontsize) {
-              let cssLineRemString = `${_.kebabCase(_o)}: ${cssValue(
-                _o,
-                v.styleValue[_o],
-                htmlFontsize
-              )};`;
-              styleRemCssLine.push(
-                _line(cssLineRemString, {indent: {tab: indent + 2}})
-              );
-            }
           }
         }
         result = result.concat(
@@ -212,20 +215,12 @@ module.exports = function (layoutData, opts) {
           styleCssLine,
           _line('}', {indent: {tab: indent}})
         );
-        if (styleRemCssLine.length > 0) {
-          remResult = remResult.concat(
-            _line(`.${v.styleName} {`, {indent: {tab: indent}}),
-            styleRemCssLine,
-            _line('}', {indent: {tab: indent}})
-          );
-        }
       });
       return {
-        _rStyle: result,
-        _rRemStyle: remResult
+        _rStyle: result
       };
 
-      function cssValue(key, value, htmlFontsize) {
+      function cssValue(key, value, unit) {
         if (!value) return value;
         if (['fontWeight'].indexOf(key) > -1) {
           return value;
@@ -233,7 +228,7 @@ module.exports = function (layoutData, opts) {
           let valueNum =
             typeof value == 'string' ? value.replace(/(px)|(rem)/, '') : value;
           if (valueNum == 1 || ['fontSize'].indexOf(key) > -1) {
-            return valueNum + 'px';
+            return valueNum * (viewportWidth / designWidth) + unit;
           }
           if (
             typeof value == 'number' ||
@@ -241,12 +236,8 @@ module.exports = function (layoutData, opts) {
             value.match(/px$/)
           ) {
             value = parseFloat(value);
-            return htmlFontsize
-              ? (
-              (value * (viewportWidth / designWidth)) /
-              htmlFontsize
-            ).toFixed(2) + 'rem'
-              : value + 'px';
+
+            return (value * (viewportWidth / designWidth)) + unit;
           } else {
             return value;
           }
@@ -579,7 +570,6 @@ module.exports = function (layoutData, opts) {
         eventContentParts,
         _line('},', {indent: {tab: indent}})
       );
-      // console.log('eventParts', eventParts);
       return eventParts;
       // }
 
